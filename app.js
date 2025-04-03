@@ -41,7 +41,7 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-app.post('/register', [
+app.post('/users/signup', [
     body('username').isEmail().withMessage('Username must be a valid email'),
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long')
 ], (req, res) => {
@@ -60,7 +60,7 @@ app.post('/register', [
     });
 });
 
-app.post('/login', (req, res) => {
+app.post('/users/login', (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {
         return res.status(400).json({ error: 'Username and password are required' });
@@ -136,6 +136,9 @@ app.get('/news', authenticateToken, async (req, res) => {
     }
 });
 
-app.listen(5000, () => {
+const server = app.listen(5000, () => {
     console.log('Server is running on port 5000');
 });
+
+module.exports = server; // Export the server instance
+
