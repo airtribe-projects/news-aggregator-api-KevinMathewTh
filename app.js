@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const sqlite3 = require('sqlite3').verbose();
 const bodyParser = require('body-parser');
 const axios = require('axios');
+const { body, validationResult } = require('express-validator');
 
 const app = express();
 app.use(bodyParser.json());
@@ -26,7 +27,7 @@ const db = new sqlite3.Database('./users.db', (err) => {
     }
 });
 
-const JWT_SECRET = 'thisismysecret';
+const JWT_SECRET = 'YpurSecretKey';
 const NEWS_API_KEY = '23329daa011940cda0fe8fea9875d14e';
 
 const authenticateToken = (req, res, next) => {
@@ -40,12 +41,16 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-app.post('/register', (req, res) => {
-    const { username, password } = req.body;
-    if (!username || !password) {
-        return res.status(400).json({ error: 'Username and password are required' });
+app.post('/register', [
+    body('username').isEmail().withMessage('Username must be a valid email'),
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long')
+], (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
     }
     
+    const { username, password } = req.body;
     const hashedPassword = bcrypt.hashSync(password, 10);
     db.run("INSERT INTO users (username, password) VALUES (?, ?)", [username, hashedPassword], function (err) {
         if (err) {
@@ -85,7 +90,15 @@ app.get('/preferences', authenticateToken, (req, res) => {
     });
 });
 
-app.put('/preferences', authenticateToken, (req, res) => {
+app.put('/preferences', authenticateToken, [
+    body('categories').notEmpty().withMessage('Categories cannot be empty'),
+    body('languages').notEmpty().withMessage('Languages cannot be empty')
+], (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+    
     const { categories, languages } = req.body;
     db.run("INSERT INTO preferences (user_id, categories, languages) VALUES (?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET categories = ?, languages = ?", 
         [req.user.userId, categories, languages, categories, languages],
@@ -111,7 +124,7 @@ app.get('/news', authenticateToken, async (req, res) => {
             const response = await axios.get(`https://newsapi.org/v2/top-headlines`, {
                 params: {
                     q: categories,
-                    // language: languages,
+                    //language: languages,
                     apiKey: NEWS_API_KEY,
                 }
             });
