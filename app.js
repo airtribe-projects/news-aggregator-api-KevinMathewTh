@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const sqlite3 = require('sqlite3').verbose();
 const bodyParser = require('body-parser');
+const axios = require('axios');
 
 const app = express();
 app.use(bodyParser.json());
@@ -25,7 +26,8 @@ const db = new sqlite3.Database('./users.db', (err) => {
     }
 });
 
-const JWT_SECRET = 'your_secret_key';
+const JWT_SECRET = 'thisismysecret';
+const NEWS_API_KEY = '23329daa011940cda0fe8fea9875d14e';
 
 const authenticateToken = (req, res, next) => {
     const token = req.header('Authorization');
@@ -94,6 +96,31 @@ app.put('/preferences', authenticateToken, (req, res) => {
             res.json({ message: 'Preferences updated successfully' });
         }
     );
+});
+
+app.get('/news', authenticateToken, async (req, res) => {
+    try {
+        db.get("SELECT categories, languages FROM preferences WHERE user_id = ?", [req.user.userId], async (err, preferences) => {
+            if (err || !preferences) {
+                return res.status(404).json({ error: 'Preferences not set' });
+            }
+            
+            const categories = preferences.categories.split(',').join(' OR ');
+            const languages = preferences.languages.split(',').join(',');
+            
+            const response = await axios.get(`https://newsapi.org/v2/top-headlines`, {
+                params: {
+                    q: categories,
+                    // language: languages,
+                    apiKey: NEWS_API_KEY,
+                }
+            });
+            
+            res.json(response.data);
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch news', details: error.message });
+    }
 });
 
 app.listen(5000, () => {
